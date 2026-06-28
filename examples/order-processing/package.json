@@ -1,0 +1,26 @@
+{
+  "name": "@beyondevent/examples-order-processing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ./src",
+    "clean": "rimraf dist .turbo tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@beyondevent/event-bus": "workspace:*",
+    "@beyondevent/runtime": "workspace:*",
+    "@beyondevent/shared": "workspace:*",
+    "@beyondevent/topology": "workspace:*",
+    "@beyondevent/worker-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "7.0.1-rc"
+  }
+}

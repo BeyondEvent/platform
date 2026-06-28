@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "drizzle.config.ts"],
+  "exclude": ["dist", "node_modules"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/tracing" },
+    { "path": "../../packages/metrics" },
+    { "path": "../../packages/topology" },
+    { "path": "../../packages/event-bus" },
+    { "path": "../../packages/runtime" },
+    { "path": "../../packages/worker-sdk" }
+  ]
+}

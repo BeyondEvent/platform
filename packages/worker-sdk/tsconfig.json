@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"],
+  "references": [
+    {
+      "path": "../shared"
+    },
+    {
+      "path": "../tracing"
+    },
+    {
+      "path": "../event-bus"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../metrics"
+    }
+  ]
+}

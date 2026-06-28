@@ -1,0 +1,16 @@
+{
+  "name": "@beyondevent/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'docs: no framework configured yet'",
+    "dev": "echo 'docs: no framework configured yet'",
+    "typecheck": "echo 'docs: no TypeScript sources yet'",
+    "lint": "echo 'docs: no sources yet'",
+    "clean": "rimraf dist .turbo"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0"
+  }
+}
