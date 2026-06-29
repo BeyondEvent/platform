@@ -1,6 +1,8 @@
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   useCreateSimulationMutation,
   useDeleteSimulationMutation,
+  useMetricsSummaryQuery,
   useSimulationsQuery,
   useTopologiesQuery,
 } from '@/lib/queries';
@@ -22,7 +24,7 @@ import {
 } from '@beyondevent/ui';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -52,9 +54,18 @@ function IndexPage() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [topologyId, setTopologyId] = useState('');
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
 
-  const { data: simulations = [], isLoading, error } = useSimulationsQuery();
+  const {
+    data: simulations = [],
+    isLoading,
+    isFetching,
+    error,
+  } = useSimulationsQuery(debouncedSearch);
+  const isSearching = search !== debouncedSearch || isFetching;
   const { data: topologies = [] } = useTopologiesQuery({ enabled: showForm });
+  const { data: metrics } = useMetricsSummaryQuery();
   const createMutation = useCreateSimulationMutation();
   const deleteMutation = useDeleteSimulationMutation();
 
@@ -269,19 +280,66 @@ function IndexPage() {
         )}
       </AnimatePresence>
 
+      {metrics !== undefined && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(
+            [
+              { label: 'Total Events', value: metrics.totalEvents },
+              { label: 'Total Simulations', value: metrics.totalSimulations },
+              { label: 'Running', value: metrics.runningSimulations },
+              { label: 'Active Workers', value: metrics.activeWorkers },
+            ] as { label: string; value: number }[]
+          ).map(({ label, value }) => (
+            <div
+              key={label}
+              className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1 shadow-sm"
+            >
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {label}
+              </span>
+              <span className="text-2xl font-extrabold text-foreground tabular-nums">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut', delay: 0.05 }}
       >
         <Card className="border-border bg-card shadow-sm">
-          <CardContent className="pt-6">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between flex-wrap gap-4">
+            <CardTitle className="text-md font-semibold text-foreground">
+              Simulations Runs List
+            </CardTitle>
+            <div className="relative w-full max-w-xs">
+              <Input
+                placeholder="Search simulations..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pr-9"
+              />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent
+            className={`pt-4 transition-opacity duration-200 ${isSearching ? 'opacity-60 pointer-events-none' : ''}`}
+          >
             <DataTable
               columns={columns}
               data={simulations}
-              isLoading={isLoading}
+              isLoading={isLoading && simulations.length === 0}
               error={error instanceof Error ? error.message : null}
-              emptyMessage="No simulations yet. Create a topology and run a simulation to visualise event flow here."
+              emptyMessage={
+                search
+                  ? 'No matching simulations found.'
+                  : 'No simulations yet. Create a topology and run a simulation to visualise event flow here.'
+              }
             />
           </CardContent>
         </Card>

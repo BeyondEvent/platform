@@ -29,10 +29,15 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
 
 // ── Query Hooks ──────────────────────────────────────────────────────
 
-export function useSimulationsQuery() {
+export function useSimulationsQuery(search?: string) {
   return useQuery({
-    queryKey: ['simulations'],
-    queryFn: () => apiRequest<Simulation[]>('/api/v1/simulations'),
+    queryKey: ['simulations', search],
+    queryFn: () => {
+      const url = search
+        ? `/api/v1/simulations?search=${encodeURIComponent(search)}`
+        : '/api/v1/simulations';
+      return apiRequest<Simulation[]>(url);
+    },
   });
 }
 
@@ -45,10 +50,16 @@ export function useSimulationQuery(id: string) {
   });
 }
 
-export function useTopologiesQuery(options?: { enabled?: boolean }) {
+export function useTopologiesQuery(options?: { enabled?: boolean; search?: string }) {
   return useQuery({
-    queryKey: ['topologies'],
-    queryFn: () => apiRequest<Topology[]>('/api/v1/topologies'),
+    queryKey: ['topologies', options?.search],
+    queryFn: () => {
+      const search = options?.search;
+      const url = search
+        ? `/api/v1/topologies?search=${encodeURIComponent(search)}`
+        : '/api/v1/topologies';
+      return apiRequest<Topology[]>(url);
+    },
     enabled: options?.enabled ?? true,
   });
 }
@@ -61,10 +72,15 @@ export function useTopologyQuery(id: string | null | undefined) {
   });
 }
 
-export function useWorkersQuery() {
+export function useWorkersQuery(search?: string) {
   return useQuery({
-    queryKey: ['workers'],
-    queryFn: () => apiRequest<Worker[]>('/api/v1/workers'),
+    queryKey: ['workers', search],
+    queryFn: () => {
+      const url = search
+        ? `/api/v1/workers?search=${encodeURIComponent(search)}`
+        : '/api/v1/workers';
+      return apiRequest<Worker[]>(url);
+    },
   });
 }
 

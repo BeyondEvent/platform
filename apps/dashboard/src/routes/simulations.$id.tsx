@@ -1,5 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { SimulationTimeline } from '@/components/simulation-timeline';
+import { TraceExplorer } from '@/components/trace-explorer';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,7 +10,6 @@ import { socket } from '../lib/socket';
 import {
   useChaosConfigQuery,
   useLinkTopologyMutation,
-  useMetricsSummaryQuery,
   useRenameSimulationMutation,
   useReplayEventMutation,
   useReplaySimulationMutation,
@@ -25,20 +26,33 @@ import {
   SimulationEventLogs,
   SimulationHeader,
   SimulationTopologyMap,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@beyondevent/ui';
-import type { PersistedEvent, SnapEdge, SnapNode, Topology } from '@beyondevent/ui';
+import type { PersistedEvent, SnapEdge, SnapNode } from '@beyondevent/ui';
 
 type FlowNode = Node<{ label: string }>;
+
+interface FaultPayload {
+  originalType: string;
+  message: string;
+  source?: string | null;
+  target?: string | null;
+}
 
 function toFlowNodes(
   snapNodes: SnapNode[],
   activeNodeIds: string[],
   expandedNodeIds: string[],
+  faultedNodeIds: string[],
 ): FlowNode[] {
   return snapNodes.map((n) => {
     const isRunning = activeNodeIds.includes(n.id);
     const isSelected = expandedNodeIds.includes(n.id);
     const isActive = isRunning || isSelected;
+    const isFaulted = faultedNodeIds.includes(n.id);
 
     const metaPos = n.metadata?.position as { x: number; y: number } | undefined;
     const x = metaPos?.x ?? 0;
@@ -48,25 +62,34 @@ function toFlowNodes(
       id: n.id,
       position: { x, y },
       data: { label: n.label },
-      style: isActive
+      style: isFaulted
         ? {
-            background: '#1e1b4b',
-            border: isSelected ? '2.5px solid #818cf8' : '2px solid #818cf8',
-            color: '#e0e7ff',
-            boxShadow: isSelected
-              ? '0 0 16px rgba(129, 140, 248, 0.4)'
-              : '0 0 10px rgba(129, 140, 248, 0.2)',
+            background: '#3b0000',
+            border: '2px solid #ef4444',
+            color: '#fca5a5',
+            boxShadow: '0 0 16px rgba(239, 68, 68, 0.5)',
             fontWeight: '600',
             transition: 'all 0.3s ease',
           }
-        : {
-            background: 'var(--card)',
-            color: 'var(--card-foreground)',
-            border: '1.5px solid var(--border)',
-            fontWeight: '600',
-            transition: 'all 0.3s ease',
-          },
-      className: isActive ? 'node-running-pulse' : 'border-border',
+        : isActive
+          ? {
+              background: '#1e1b4b',
+              border: isSelected ? '2.5px solid #818cf8' : '2px solid #818cf8',
+              color: '#e0e7ff',
+              boxShadow: isSelected
+                ? '0 0 16px rgba(129, 140, 248, 0.4)'
+                : '0 0 10px rgba(129, 140, 248, 0.2)',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+            }
+          : {
+              background: 'var(--card)',
+              color: 'var(--card-foreground)',
+              border: '1.5px solid var(--border)',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+            },
+      className: isFaulted ? 'node-fault-pulse' : isActive ? 'node-running-pulse' : 'border-border',
     };
   });
 }
@@ -77,11 +100,14 @@ function toFlowEdges(
   activeTargetId?: string,
   expandedSourceId?: string,
   expandedTargetId?: string,
+  faultedSourceId?: string,
+  faultedTargetId?: string,
 ): Edge[] {
   return snapEdges.map((e) => {
     const isPropagating = activeSourceId === e.source && activeTargetId === e.target;
     const isSelected = expandedSourceId === e.source && expandedTargetId === e.target;
     const isActive = isPropagating || isSelected;
+    const isFaulted = faultedSourceId === e.source && faultedTargetId === e.target;
     return {
       id: e.id,
       source: e.source,
@@ -89,9 +115,11 @@ function toFlowEdges(
       animated: isPropagating,
       selected: isSelected,
       label: e.label,
-      style: isActive
-        ? { stroke: '#818cf8', strokeWidth: isSelected ? 3 : 2.5, transition: 'all 0.3s ease' }
-        : { stroke: 'var(--border)', strokeWidth: 1.5, transition: 'all 0.3s ease' },
+      style: isFaulted
+        ? { stroke: '#ef4444', strokeWidth: 3, transition: 'all 0.3s ease' }
+        : isActive
+          ? { stroke: '#818cf8', strokeWidth: isSelected ? 3 : 2.5, transition: 'all 0.3s ease' }
+          : { stroke: 'var(--border)', strokeWidth: 1.5, transition: 'all 0.3s ease' },
     };
   });
 }
@@ -106,6 +134,9 @@ function SimulationDetailPage() {
   const [pendingTopologyId, setPendingTopologyId] = useState<string>('');
   const [topologySelectorOpen, setTopologySelectorOpen] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [faultedSourceId, setFaultedSourceId] = useState<string | undefined>();
+  const [faultedTargetId, setFaultedTargetId] = useState<string | undefined>();
+  const [scrubTs, setScrubTs] = useState<number | null>(null);
 
   const { data: sim, isLoading } = useSimulationQuery(id);
   const { data: topology } = useTopologyQuery(sim?.topologyId);
@@ -113,7 +144,6 @@ function SimulationDetailPage() {
   const { data: persistedEvents = [], refetch: refetchEvents } = useSimulationEventsQuery(id);
   const { data: chaosConfig } = useChaosConfigQuery(id);
   const updateChaosMutation = useUpdateChaosMutation(id);
-  const { data: metrics } = useMetricsSummaryQuery();
 
   useEffect(() => {
     socket.emit('simulation:join', id);
@@ -124,9 +154,24 @@ function SimulationDetailPage() {
         return [event, ...prev];
       });
       void qc.invalidateQueries({ queryKey: ['simulation', id] });
+
+      if (event.type === 'chaos.fault.injected') {
+        const p = event.payload as unknown as FaultPayload;
+        const fSrc = topology?.snapshot.nodes.find(
+          (n) => n.id === p.source || n.label === p.source,
+        )?.id;
+        const fTgt = topology?.snapshot.nodes.find(
+          (n) => n.id === p.target || n.label === p.target,
+        )?.id;
+        setFaultedSourceId(fSrc);
+        setFaultedTargetId(fTgt);
+        setTimeout(() => {
+          setFaultedSourceId(undefined);
+          setFaultedTargetId(undefined);
+        }, 4000);
+      }
     }
 
-    // Re-join the room after reconnect (handles API restart or startup race)
     function onReconnect() {
       socket.emit('simulation:join', id);
     }
@@ -139,7 +184,7 @@ function SimulationDetailPage() {
       socket.off('simulation:event', onSimulationEvent);
       socket.off('connect', onReconnect);
     };
-  }, [id, qc]);
+  }, [id, qc, topology]);
 
   const statusMutation = useUpdateSimulationStatusMutation(id);
   const renameMutation = useRenameSimulationMutation(id);
@@ -189,6 +234,11 @@ function SimulationDetailPage() {
 
   const isRunning = sim.status === 'running';
 
+  const displayEvents =
+    scrubTs !== null
+      ? persistedEvents.filter((e) => new Date(e.occurredAt).getTime() <= scrubTs)
+      : persistedEvents;
+
   const mostRecentEvent =
     isRunning && persistedEvents.length > 0
       ? persistedEvents.reduce((prev, curr) =>
@@ -237,8 +287,12 @@ function SimulationDetailPage() {
     (nid): nid is string => nid != null,
   );
 
+  const faultedNodeIds = [faultedSourceId, faultedTargetId].filter(
+    (nid): nid is string => nid != null,
+  );
+
   const flowNodes = topology
-    ? toFlowNodes(topology.snapshot.nodes, activeNodeIds, expandedNodeIds)
+    ? toFlowNodes(topology.snapshot.nodes, activeNodeIds, expandedNodeIds, faultedNodeIds)
     : [];
   const flowEdges = topology
     ? toFlowEdges(
@@ -247,13 +301,15 @@ function SimulationDetailPage() {
         activeTargetId,
         expandedSourceId,
         expandedTargetId,
+        faultedSourceId,
+        faultedTargetId,
       )
     : [];
 
   const contextValue = {
     sim,
     topology,
-    persistedEvents,
+    persistedEvents: displayEvents,
     mostRecentEvent,
     expandedEventId,
     setExpandedEventId,
@@ -288,7 +344,22 @@ function SimulationDetailPage() {
           <SimulationTopologyMap />
         </section>
         <section>
-          <SimulationEventLogs />
+          <Tabs defaultValue="events" className="w-full">
+            <TabsList variant="line" className="w-full justify-start mb-3">
+              <TabsTrigger value="events">Events</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="traces">Traces</TabsTrigger>
+            </TabsList>
+            <TabsContent value="events">
+              <SimulationEventLogs />
+            </TabsContent>
+            <TabsContent value="timeline">
+              <SimulationTimeline events={persistedEvents} onScrub={setScrubTs} />
+            </TabsContent>
+            <TabsContent value="traces">
+              <TraceExplorer events={persistedEvents} />
+            </TabsContent>
+          </Tabs>
         </section>
         {chaosConfig !== undefined && (
           <section>
@@ -298,40 +369,6 @@ function SimulationDetailPage() {
               isPending={updateChaosMutation.isPending}
               onSave={(cfg) => updateChaosMutation.mutate(cfg)}
             />
-          </section>
-        )}
-        {metrics !== undefined && (
-          <section>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(
-                [
-                  { label: 'Total Events', value: metrics.totalEvents },
-                  { label: 'Total Simulations', value: metrics.totalSimulations },
-                  { label: 'Running', value: metrics.runningSimulations },
-                  { label: 'Active Workers', value: metrics.activeWorkers },
-                ] as { label: string; value: number }[]
-              ).map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1 shadow-sm"
-                >
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {label}
-                  </span>
-                  <span className="text-2xl font-extrabold text-foreground tabular-nums">
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-1.5 text-right">
-              Broker:{' '}
-              <span
-                className={`font-semibold ${metrics.brokerConnected ? 'text-emerald-500' : 'text-rose-500'}`}
-              >
-                {metrics.brokerType} {metrics.brokerConnected ? '●' : '○'}
-              </span>
-            </p>
           </section>
         )}
       </main>

@@ -43,13 +43,18 @@ export async function workerRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['Workers'],
-        querystring: z.object({ simulationId: z.uuid().optional() }),
+        querystring: z.object({
+          simulationId: z.uuid().optional(),
+          search: z.string().optional(),
+        }),
         response: { 200: z.array(WorkerSchema) },
       },
     },
-    async () => {
+    async (req) => {
+      const { search } = req.query;
       const rows = await app.db.query.workers.findMany({
-        orderBy: (t, { asc }) => [asc(t.name)],
+        where: search ? (t, { ilike }) => ilike(t.name, `%${search}%`) : undefined,
+        orderBy: (t, { desc }) => [desc(t.createdAt)],
       });
       return rows.map(toResponse);
     },

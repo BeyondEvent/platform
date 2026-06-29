@@ -74,19 +74,3 @@ export function createMetricsMiddleware(registry: IMetricsRegistry): IPipelineMi
     },
   };
 }
-
-// ponytail: no-op until Phase 6 (Chaos Engineering)
-export function createChaosMiddleware(): IPipelineMiddleware {
-  // Phase 6 — Chaos Middleware:
-  // 1. Accept a ChaosConfig: { faultRate: number; latencyMs?: number; errorType?: string }
-  // 2. In execute(): if Math.random() < faultRate → throw the configured error (or inject latency)
-  // 3. Make faultRate runtime-configurable so you can toggle chaos without redeploying
-  // 4. Emit a chaos.injected DomainEvent so the dashboard can visualise fault injection
-  // Best practices: chaos should be OPT-IN per simulation, never global — gate on ctx.simulationId
-  return {
-    name: 'chaos',
-    async execute(_event, _ctx, next) {
-      await next();
-    },
-  };
-}

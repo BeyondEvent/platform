@@ -1,4 +1,5 @@
 import '@xyflow/react/dist/style.css';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   useDeleteTopologyMutation,
   useSaveTopologyMutation,
@@ -10,6 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Input,
   TopologyEditor,
   TopologyList,
 } from '@beyondevent/ui';
@@ -17,7 +19,7 @@ import type { SharedTopology, SnapEdge, SnapNode } from '@beyondevent/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { addEdge, useEdgesState, useNodesState } from '@xyflow/react';
 import type { Connection, Edge, Node } from '@xyflow/react';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -65,6 +67,8 @@ function TopologiesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
 
   // Editor state
   const [topologyName, setTopologyName] = useState('');
@@ -74,7 +78,12 @@ function TopologiesPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [edgeLabelValue, setEdgeLabelValue] = useState('');
 
-  const { data: topologies = [], isLoading } = useTopologiesQuery();
+  const {
+    data: topologies = [],
+    isLoading,
+    isFetching,
+  } = useTopologiesQuery({ search: debouncedSearch });
+  const isSearching = search !== debouncedSearch || isFetching;
   const saveMutation = useSaveTopologyMutation();
   const deleteMutation = useDeleteTopologyMutation();
 
@@ -103,7 +112,10 @@ function TopologiesPage() {
       {
         id,
         type: 'default',
-        position: { x: (nds.length % 4) * 200, y: Math.floor(nds.length / 4) * 120 },
+        position: {
+          x: (nds.length % 4) * 200,
+          y: Math.floor(nds.length / 4) * 120,
+        },
         data: { label: newNodeLabel.trim() },
         style: {
           background: 'var(--card)',
@@ -245,15 +257,42 @@ function TopologiesPage() {
         <p className="text-sm text-muted-foreground animate-pulse">Loading topologies…</p>
       )}
 
+      {!showEditor && (topologies.length > 0 || search !== '') && (
+        <Card className="border-border bg-card shadow-sm mb-4">
+          <CardHeader className="py-3 flex flex-row items-center justify-between flex-wrap gap-4">
+            <CardTitle className="text-md font-semibold text-foreground">
+              Saved Topologies
+            </CardTitle>
+            <div className="relative w-full max-w-xs">
+              <Input
+                placeholder="Search topologies..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pr-9"
+              />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              )}
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       {!isLoading && topologies.length === 0 && !showEditor && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center min-h-[30vh] border border-dashed border-border rounded-xl p-8 text-center bg-muted/10"
         >
-          <p className="text-lg font-semibold text-foreground">No topologies yet</p>
+          <p className="text-lg font-semibold text-foreground">
+            {search ? 'No matching topologies found' : 'No topologies yet'}
+          </p>
           <p className="text-sm text-muted-foreground max-w-sm mt-1">
-            Create a topology first to define components and event channels for your runs.
+            {search
+              ? 'Try adjusting your search keywords.'
+              : 'Create a topology first to define components and event channels for your runs.'}
           </p>
         </motion.div>
       )}
@@ -263,6 +302,7 @@ function TopologiesPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: 'easeOut', delay: 0.05 }}
+          className={`transition-opacity duration-200 ${isSearching ? 'opacity-60 pointer-events-none' : ''}`}
         >
           <TopologyList
             topologies={topologies}

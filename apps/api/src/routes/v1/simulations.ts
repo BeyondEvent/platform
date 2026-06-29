@@ -31,11 +31,16 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['Simulations'],
+        querystring: z.object({
+          search: z.string().optional(),
+        }),
         response: { 200: z.array(SimulationSchema) },
       },
     },
-    async () => {
+    async (req) => {
+      const { search } = req.query;
       const rows = await app.db.query.simulations.findMany({
+        where: search ? (t, { ilike }) => ilike(t.name, `%${search}%`) : undefined,
         orderBy: (t, { desc }) => [desc(t.createdAt)],
       });
       return rows.map(toResponse);

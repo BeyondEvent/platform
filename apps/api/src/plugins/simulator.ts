@@ -23,7 +23,12 @@ async function applyChaosThenPublish(
       await app.eventBus.publish({
         id: generateId() as EventId,
         type: 'chaos.fault.injected' as EventType,
-        payload: { originalType: event.type, message: chaos.errorMessage },
+        payload: {
+          originalType: event.type,
+          message: chaos.errorMessage,
+          source: (event.payload as Record<string, unknown>).source ?? null,
+          target: (event.payload as Record<string, unknown>).target ?? null,
+        },
         traceContext: event.traceContext,
         occurredAt: Date.now() as Timestamp,
         version: 1,

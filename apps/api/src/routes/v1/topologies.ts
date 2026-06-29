@@ -47,11 +47,16 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['Topologies'],
+        querystring: z.object({
+          search: z.string().optional(),
+        }),
         response: { 200: z.array(TopologySchema) },
       },
     },
-    async () => {
+    async (req) => {
+      const { search } = req.query;
       const rows = await app.db.query.topologies.findMany({
+        where: search ? (t, { ilike }) => ilike(t.name, `%${search}%`) : undefined,
         orderBy: (t, { desc }) => [desc(t.createdAt)],
       });
       return rows.map(toResponse);

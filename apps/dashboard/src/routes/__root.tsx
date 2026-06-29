@@ -1,5 +1,6 @@
 import { RootLayout } from '@/layouts/root-layout';
 import { socket } from '@/lib/socket';
+import { ThemeProvider } from '@/providers/theme-provider';
 import { useAppStore } from '@/store/app-store';
 import { useEventStore } from '@/store/event-store';
 import type { LiveEvent } from '@/store/event-store';
@@ -28,8 +29,10 @@ function Root() {
   }, [setIsConnected, addEvent]);
 
   return (
-    <RootLayout>
-      <Outlet />
-    </RootLayout>
+    <ThemeProvider>
+      <RootLayout>
+        <Outlet />
+      </RootLayout>
+    </ThemeProvider>
   );
 }

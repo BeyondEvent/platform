@@ -69,6 +69,19 @@ export {
   SelectValue,
 } from './components/ui/select';
 
+export {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from './components/ui/accordion';
+
+export { Slider } from './components/ui/slider';
+
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
+
+export { InteractiveGridPattern } from './components/ui/interactive-grid-pattern';
+
 // ── Simulation components ─────────────────────────────────────────────
 export { SimulationChaosPanel } from './components/simulation/chaos-panel';
 export type {

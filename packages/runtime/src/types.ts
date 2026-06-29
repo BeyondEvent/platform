@@ -1,9 +1,9 @@
 import type { DomainEvent } from '@beyondevent/event-bus';
-import type { SimulationId, Timestamp, WorkerId } from '@beyondevent/shared';
+import type { SimulationId, Timestamp } from '@beyondevent/shared';
 import type { TraceContext } from '@beyondevent/tracing';
 
 export type { DomainEvent } from '@beyondevent/event-bus';
-export type { SimulationId, Timestamp, WorkerId } from '@beyondevent/shared';
+export type { SimulationId, Timestamp } from '@beyondevent/shared';
 export type { TraceContext } from '@beyondevent/tracing';
 
 export interface ScheduledTask {
@@ -11,11 +11,6 @@ export interface ScheduledTask {
   readonly executeAt: Timestamp;
   readonly handler: () => Promise<void>;
   readonly retries?: number;
-}
-
-export interface DispatchContext {
-  readonly traceContext: TraceContext;
-  readonly timeoutMs?: number;
 }
 
 export interface PipelineContext {
