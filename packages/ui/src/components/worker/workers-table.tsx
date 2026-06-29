@@ -1,4 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table';
+import { Trash2 } from 'lucide-react';
 import { DataTable } from '../data-table/index';
 import { Badge } from '../ui/badge';
 
@@ -31,7 +32,7 @@ const STATE_CLASSES: Record<Worker['state'], string> = {
   error: 'text-rose-500 border-rose-500/30 bg-rose-500/5',
 };
 
-export const columns: ColumnDef<Worker>[] = [
+const baseColumns: ColumnDef<Worker>[] = [
   {
     accessorKey: 'name',
     header: 'Name',
@@ -91,9 +92,30 @@ export const columns: ColumnDef<Worker>[] = [
 export interface WorkersTableProps {
   workers: Worker[];
   isLoading: boolean;
+  onDelete?: (id: string) => void;
 }
 
-export function WorkersTable({ workers, isLoading }: WorkersTableProps) {
+export function WorkersTable({ workers, isLoading, onDelete }: WorkersTableProps) {
+  const columns: ColumnDef<Worker>[] = onDelete
+    ? [
+        ...baseColumns,
+        {
+          id: 'actions',
+          header: '',
+          cell: ({ row }) => (
+            <button
+              type="button"
+              onClick={() => onDelete(row.original.id)}
+              className="text-rose-500 hover:text-rose-400 transition-colors cursor-pointer"
+              title="Delete worker"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          ),
+        },
+      ]
+    : baseColumns;
+
   return (
     <DataTable
       columns={columns}

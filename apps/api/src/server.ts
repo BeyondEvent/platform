@@ -15,6 +15,7 @@ declare module 'fastify' {
     db: DbClient;
     eventBus: IReplayableEventBusAdapter;
     metrics: IMetricsRegistry;
+    brokerType: 'redis' | 'memory';
   }
 }
 
@@ -32,6 +33,7 @@ export async function createApp(ctx: BootstrapContext): Promise<FastifyInstance>
   app.decorate('db', ctx.db);
   app.decorate('eventBus', ctx.eventBus);
   app.decorate('metrics', ctx.metrics);
+  app.decorate('brokerType', ctx.brokerType);
 
   await app.register(healthRoutes);
   await app.register(v1Routes, { prefix: '/api/v1' });

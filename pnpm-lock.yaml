@@ -210,6 +210,21 @@ importers:
         specifier: ^6.0.0
         version: 6.1.3
 
+  examples/ecommerce-flow:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
+      rimraf:
+        specifier: ^6.0.0
+        version: 6.1.3
+      tsx:
+        specifier: ^4.19.0
+        version: 4.22.4
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+
   examples/flash-sale:
     dependencies:
       '@beyondevent/event-bus':

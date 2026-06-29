@@ -23,6 +23,7 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.message || `Request failed with status ${res.status}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -40,6 +41,7 @@ export function useSimulationQuery(id: string) {
     queryKey: ['simulation', id],
     queryFn: () => apiRequest<Simulation>(`/api/v1/simulations/${id}`),
     enabled: !!id,
+    refetchInterval: (query) => (query.state.data?.status === 'running' ? 2_000 : false),
   });
 }
 
@@ -63,7 +65,6 @@ export function useWorkersQuery() {
   return useQuery({
     queryKey: ['workers'],
     queryFn: () => apiRequest<Worker[]>('/api/v1/workers'),
-    refetchInterval: 5_000,
   });
 }
 
@@ -74,7 +75,7 @@ export function useSimulationEventsQuery(simulationId: string) {
       apiRequest<PersistedEvent[]>(
         `/api/v1/events?simulationId=${simulationId}&limit=100&order=desc`,
       ),
-    refetchInterval: 30_000,
+    refetchInterval: 3_000,
     enabled: !!simulationId,
   });
 }
@@ -157,6 +158,86 @@ export function useReplaySimulationMutation(simulationId: string, refetchEvents:
         body: JSON.stringify({}),
       }),
     onSuccess: () => refetchEvents(),
+  });
+}
+
+// ── Chaos Hooks ──────────────────────────────────────────────────────
+
+export interface ChaosConfig {
+  enabled: boolean;
+  faultRate: number;
+  latencyMs: number;
+  errorMessage: string;
+  duplicateRate: number;
+}
+
+export function useChaosConfigQuery(simulationId: string) {
+  return useQuery({
+    queryKey: ['chaos', simulationId],
+    queryFn: () => apiRequest<ChaosConfig>(`/api/v1/chaos/${simulationId}`),
+    enabled: !!simulationId,
+  });
+}
+
+export function useUpdateChaosMutation(simulationId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: Partial<ChaosConfig>) =>
+      apiRequest<ChaosConfig>(`/api/v1/chaos/${simulationId}`, {
+        method: 'PUT',
+        body: JSON.stringify(cfg),
+      }),
+    onSuccess: (updated) => {
+      qc.setQueryData(['chaos', simulationId], updated);
+    },
+  });
+}
+
+export function useDeleteSimulationMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest<void>(`/api/v1/simulations/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['simulations'] });
+    },
+  });
+}
+
+export function useDeleteTopologyMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest<void>(`/api/v1/topologies/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['topologies'] });
+    },
+  });
+}
+
+export function useDeleteWorkerMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest<void>(`/api/v1/workers/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['workers'] });
+    },
+  });
+}
+
+export interface MetricsSummary {
+  totalEvents: number;
+  totalSimulations: number;
+  runningSimulations: number;
+  completedSimulations: number;
+  activeWorkers: number;
+  brokerType: 'redis' | 'memory';
+  brokerConnected: boolean;
+}
+
+export function useMetricsSummaryQuery() {
+  return useQuery({
+    queryKey: ['metrics', 'summary'],
+    queryFn: () => apiRequest<MetricsSummary>('/api/v1/metrics/summary'),
+    refetchInterval: 10_000,
   });
 }
 

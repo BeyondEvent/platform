@@ -1,8 +1,9 @@
-import { RefreshCw, RotateCcw } from 'lucide-react';
+import { RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { useSimulation } from './context';
 
@@ -16,6 +17,17 @@ const SimulationEventLogsComponent = () => {
     refetchEvents,
   } = useSimulation();
 
+  const [traceFilter, setTraceFilter] = useState('');
+
+  const filteredEvents = traceFilter.trim()
+    ? persistedEvents.filter(
+        (e) =>
+          e.traceId?.includes(traceFilter.trim()) ||
+          e.correlationId?.includes(traceFilter.trim()) ||
+          e.type?.includes(traceFilter.trim()),
+      )
+    : persistedEvents;
+
   return (
     <Card className="bg-card border-border shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-3 space-y-0">
@@ -28,26 +40,49 @@ const SimulationEventLogsComponent = () => {
             payloads.
           </CardDescription>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void refetchEvents()}
-          className="flex items-center gap-1.5 font-semibold"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          <span>Refresh Logs</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              value={traceFilter}
+              onChange={(e) => setTraceFilter(e.target.value)}
+              placeholder="Filter by trace / type…"
+              className="pl-8 pr-7 h-8 text-xs w-48 bg-background border-border"
+            />
+            {traceFilter && (
+              <button
+                type="button"
+                onClick={() => setTraceFilter('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void refetchEvents()}
+            className="flex items-center gap-1.5 font-semibold"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Refresh Logs</span>
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-4">
-        {persistedEvents.length === 0 ? (
+        {filteredEvents.length === 0 ? (
           <p className="text-sm text-muted-foreground italic py-4">
-            No events persisted yet. Events appear in this stream as they propagate.
+            {traceFilter
+              ? 'No events match the filter.'
+              : 'No events persisted yet. Events appear in this stream as they propagate.'}
           </p>
         ) : (
           <ScrollArea className="h-80 border border-border rounded-lg p-2.5 bg-muted/10">
             <ul className="space-y-1.5">
-              {persistedEvents.map((e) => {
+              {filteredEvents.map((e) => {
                 const isExpanded = expandedEventId === e.id;
                 const isActive = mostRecentEvent?.id === e.id;
                 return (

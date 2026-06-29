@@ -21,7 +21,7 @@ const TopologyEdgeSchema = z.object({
 });
 
 const TopologySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: z.string(),
   snapshot: z.object({
     nodes: z.array(z.unknown()),
@@ -44,7 +44,12 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
 
   a.get(
     '/',
-    { schema: { tags: ['Topologies'], response: { 200: z.array(TopologySchema) } } },
+    {
+      schema: {
+        tags: ['Topologies'],
+        response: { 200: z.array(TopologySchema) },
+      },
+    },
     async () => {
       const rows = await app.db.query.topologies.findMany({
         orderBy: (t, { desc }) => [desc(t.createdAt)],
@@ -58,8 +63,11 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['Topologies'],
-        params: z.object({ id: z.string().uuid() }),
-        response: { 200: TopologySchema, 404: z.object({ message: z.string() }) },
+        params: z.object({ id: z.uuid() }),
+        response: {
+          200: TopologySchema,
+          404: z.object({ message: z.string() }),
+        },
       },
     },
     async (req, reply) => {
@@ -81,7 +89,10 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
           nodes: z.array(TopologyNodeSchema).default([]),
           edges: z.array(TopologyEdgeSchema).default([]),
         }),
-        response: { 201: TopologySchema, 422: z.object({ errors: z.array(z.string()) }) },
+        response: {
+          201: TopologySchema,
+          422: z.object({ errors: z.array(z.string()) }),
+        },
       },
     },
     async (req, reply) => {
@@ -114,7 +125,7 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['Topologies'],
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.uuid() }),
         body: z.object({
           name: z.string().min(1).optional(),
           nodes: z.array(TopologyNodeSchema).optional(),
@@ -169,16 +180,27 @@ export async function topologyRoutes(app: FastifyInstance): Promise<void> {
 
       const [row] = await app.db
         .update(topologies)
-        .set({
-          name,
-          snapshot,
-          updatedAt: new Date(),
-        })
+        .set({ name, snapshot, updatedAt: new Date() })
         .where(eq(topologies.id, req.params.id))
         .returning();
 
       if (row === undefined) return reply.status(404).send({ message: 'Topology not found' });
       return reply.send(toResponse(row));
+    },
+  );
+
+  a.delete(
+    '/:id',
+    {
+      schema: {
+        tags: ['Topologies'],
+        params: z.object({ id: z.uuid() }),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      await app.db.delete(topologies).where(eq(topologies.id, req.params.id));
+      return reply.status(204).send(null);
     },
   );
 }

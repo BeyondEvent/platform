@@ -8,6 +8,15 @@ async function main(): Promise<void> {
   const ctx = await bootstrap();
   const app = await createApp(ctx);
 
+  app.log.info(`[DB] Connected — ${ctx.config.DATABASE_URL.replace(/:[^:@]+@/, ':***@')}`);
+  if (ctx.brokerType === 'redis') {
+    app.log.info(`[Broker] Redis Streams connected — ${ctx.config.REDIS_URL}`);
+  } else if (ctx.config.REDIS_URL) {
+    app.log.warn(`[Broker] Redis unreachable (${ctx.config.REDIS_URL}), using in-memory fallback`);
+  } else {
+    app.log.info('[Broker] In-memory event bus (no REDIS_URL configured)');
+  }
+
   // Attach WebSocket gateway to Fastify's underlying HTTP server before listening.
   ctx.gateway.attach(app.server);
 

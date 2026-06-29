@@ -1,9 +1,50 @@
 import type { EventType } from '@beyondevent/event-bus';
+import { generateId } from '@beyondevent/shared';
 import type { EventId, SimulationId, Timestamp } from '@beyondevent/shared';
 import type { CausationId, CorrelationId, SpanId, TraceId } from '@beyondevent/tracing';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { simulations, topologies } from '../db';
+import { getChaosConfig } from './chaos-store';
+
+async function applyChaosThenPublish(
+  app: FastifyInstance,
+  simulationId: string,
+  event: Parameters<typeof app.eventBus.publish>[0],
+): Promise<void> {
+  const chaos = getChaosConfig(simulationId);
+
+  if (chaos.enabled) {
+    if (chaos.latencyMs > 0) {
+      await new Promise((r) => setTimeout(r, chaos.latencyMs));
+    }
+    if (Math.random() < chaos.faultRate) {
+      // Emit a fault event instead of the original
+      await app.eventBus.publish({
+        id: generateId() as EventId,
+        type: 'chaos.fault.injected' as EventType,
+        payload: { originalType: event.type, message: chaos.errorMessage },
+        traceContext: event.traceContext,
+        occurredAt: Date.now() as Timestamp,
+        version: 1,
+        simulationId: event.simulationId,
+      });
+      return;
+    }
+
+    if (chaos.duplicateRate > 0 && Math.random() < chaos.duplicateRate) {
+      await app.eventBus.publish(event);
+      await app.eventBus.publish({
+        ...event,
+        id: generateId() as EventId,
+        occurredAt: Date.now() as Timestamp,
+      });
+      return;
+    }
+  }
+
+  await app.eventBus.publish(event);
+}
 
 export function runSimulationTask(app: FastifyInstance, simulationId: string) {
   setTimeout(async () => {
@@ -14,14 +55,14 @@ export function runSimulationTask(app: FastifyInstance, simulationId: string) {
       if (sim === undefined || sim.status !== 'running') return;
 
       if (!sim.topologyId) {
-        const traceId = crypto.randomUUID() as TraceId;
-        const correlationId = crypto.randomUUID() as CorrelationId;
+        const traceId = generateId() as TraceId;
+        const correlationId = generateId() as CorrelationId;
 
         const fallbackEvents = [
           { type: 'simulation.started', payload: { message: 'Simulation run started.' } },
           {
             type: 'order.received',
-            payload: { orderId: crypto.randomUUID().slice(0, 8), amount: 120 },
+            payload: { orderId: generateId().slice(0, 8), amount: 120 },
           },
           { type: 'payment.processed', payload: { status: 'SUCCESS' } },
           {
@@ -37,11 +78,11 @@ export function runSimulationTask(app: FastifyInstance, simulationId: string) {
           });
           if (currentSim === undefined || currentSim.status !== 'running') break;
 
-          const spanId = crypto.randomUUID() as SpanId;
-          const causationId = i > 0 ? (crypto.randomUUID() as CausationId) : null;
+          const spanId = generateId() as SpanId;
+          const causationId = i > 0 ? (generateId() as CausationId) : null;
 
-          await app.eventBus.publish({
-            id: crypto.randomUUID() as EventId,
+          await applyChaosThenPublish(app, simulationId, {
+            id: generateId() as EventId,
             type: ev.type as EventType,
             payload: ev.payload,
             traceContext: {
@@ -80,8 +121,8 @@ export function runSimulationTask(app: FastifyInstance, simulationId: string) {
 
       if (nodes.length === 0) return;
 
-      const traceId = crypto.randomUUID() as TraceId;
-      const correlationId = crypto.randomUUID() as CorrelationId;
+      const traceId = generateId() as TraceId;
+      const correlationId = generateId() as CorrelationId;
 
       const executedEdgeIds = new Set<string>();
       let currentSourceIds = nodes
@@ -122,11 +163,11 @@ export function runSimulationTask(app: FastifyInstance, simulationId: string) {
             message: `Event processed from ${sourceNode?.label || 'source'} to ${targetNode?.label || 'target'}`,
           };
 
-          const spanId = crypto.randomUUID() as SpanId;
+          const spanId = generateId() as SpanId;
           const causationId = lastSpanId as CausationId | null;
 
-          await app.eventBus.publish({
-            id: crypto.randomUUID() as EventId,
+          await applyChaosThenPublish(app, simulationId, {
+            id: generateId() as EventId,
             type: eventType as EventType,
             payload,
             traceContext: {

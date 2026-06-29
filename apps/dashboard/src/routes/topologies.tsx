@@ -1,5 +1,9 @@
 import '@xyflow/react/dist/style.css';
-import { useSaveTopologyMutation, useTopologiesQuery } from '@/lib/queries';
+import {
+  useDeleteTopologyMutation,
+  useSaveTopologyMutation,
+  useTopologiesQuery,
+} from '@/lib/queries';
 import {
   Button,
   Card,
@@ -72,6 +76,7 @@ function TopologiesPage() {
 
   const { data: topologies = [], isLoading } = useTopologiesQuery();
   const saveMutation = useSaveTopologyMutation();
+  const deleteMutation = useDeleteTopologyMutation();
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -264,6 +269,7 @@ function TopologiesPage() {
             expandedId={expandedId}
             setExpandedId={setExpandedId}
             onEdit={handleStartEdit}
+            onDelete={(id) => deleteMutation.mutate(id)}
             toFlowNodes={toFlowNodes}
             toFlowEdges={toFlowEdges}
           />

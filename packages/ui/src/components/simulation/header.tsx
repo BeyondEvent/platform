@@ -30,8 +30,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 };
 
 const SimulationHeaderComponent = () => {
-  const { sim, persistedEvents, replaySimMutation, statusMutation, renameMutation } =
-    useSimulation();
+  const { sim, replaySimMutation, statusMutation, renameMutation } = useSimulation();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState('');
@@ -116,7 +115,7 @@ const SimulationHeaderComponent = () => {
           <Button
             size="sm"
             onClick={() => replaySimMutation.mutate()}
-            disabled={replaySimMutation.isPending || persistedEvents.length === 0}
+            disabled={replaySimMutation.isPending || sim.status === 'running'}
             className="flex items-center gap-1.5 font-semibold"
           >
             <RotateCcw

@@ -7,12 +7,7 @@ export async function publishToStream(
   maxLen: number,
   event: DomainEvent,
 ): Promise<void> {
-  await redis.xadd(
-    streamKey,
-    'MAXLEN',
-    '~',
-    maxLen,
-    '*',
+  const fields: string[] = [
     'id',
     event.id,
     'type',
@@ -25,5 +20,9 @@ export async function publishToStream(
     String(event.occurredAt),
     'version',
     String(event.version),
-  );
+  ];
+  if (event.simulationId !== undefined) {
+    fields.push('simulationId', event.simulationId);
+  }
+  await redis.xadd(streamKey, 'MAXLEN', '~', maxLen, '*', ...fields);
 }

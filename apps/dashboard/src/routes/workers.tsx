@@ -1,4 +1,4 @@
-import { useWorkersQuery } from '@/lib/queries';
+import { useDeleteWorkerMutation, useWorkersQuery } from '@/lib/queries';
 import { Card, CardDescription, CardHeader, CardTitle, WorkersTable } from '@beyondevent/ui';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -8,6 +8,7 @@ export const Route = createFileRoute('/workers')({
 
 function WorkersPage() {
   const { data: workers = [], isLoading } = useWorkersQuery();
+  const deleteMutation = useDeleteWorkerMutation();
 
   return (
     <main className="max-w-5xl mx-auto px-4 space-y-6">
@@ -23,7 +24,11 @@ function WorkersPage() {
       </Card>
 
       <section>
-        <WorkersTable workers={workers} isLoading={isLoading} />
+        <WorkersTable
+          workers={workers}
+          isLoading={isLoading}
+          onDelete={(id) => deleteMutation.mutate(id)}
+        />
       </section>
     </main>
   );

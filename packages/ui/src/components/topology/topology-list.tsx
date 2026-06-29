@@ -1,6 +1,6 @@
 import { Background, Controls, ReactFlow } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
-import { ChevronDown, Eye } from 'lucide-react';
+import { ChevronDown, Eye, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import type { SnapEdge, SnapNode, Topology } from './types';
@@ -10,6 +10,7 @@ export interface TopologyListProps {
   expandedId: string | null;
   setExpandedId: (id: string | null) => void;
   onEdit: (t: Topology) => void;
+  onDelete?: (id: string) => void;
   toFlowNodes: (snapNodes: SnapNode[]) => Node<{ label: string }>[];
   toFlowEdges: (snapEdges: SnapEdge[]) => Edge[];
 }
@@ -19,6 +20,7 @@ export function TopologyList({
   expandedId,
   setExpandedId,
   onEdit,
+  onDelete,
   toFlowNodes,
   toFlowEdges,
 }: TopologyListProps) {
@@ -47,6 +49,17 @@ export function TopologyList({
               >
                 Edit
               </Button>
+              {onDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(t.id)}
+                  className="cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-1 h-8"
+                  title="Delete topology"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <span className="text-border">|</span>
               <Button
                 variant="ghost"

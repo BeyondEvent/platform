@@ -21,6 +21,8 @@ export { Skeleton } from './components/ui/skeleton';
 
 export { Input } from './components/ui/input';
 
+export { Label } from './components/ui/label';
+
 export {
   Table,
   TableBody,
@@ -68,6 +70,11 @@ export {
 } from './components/ui/select';
 
 // ── Simulation components ─────────────────────────────────────────────
+export { SimulationChaosPanel } from './components/simulation/chaos-panel';
+export type {
+  ChaosConfig as SimulationChaosConfig,
+  SimulationChaosPanelProps,
+} from './components/simulation/chaos-panel';
 export { SimulationContext, useSimulation } from './components/simulation/context';
 export type {
   Simulation,

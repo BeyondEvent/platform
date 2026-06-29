@@ -8,7 +8,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
+    "allowArbitraryExtensions": true,
     "paths": {
       "@/*": ["./src/*"]
     }

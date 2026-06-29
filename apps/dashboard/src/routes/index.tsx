@@ -1,5 +1,6 @@
 import {
   useCreateSimulationMutation,
+  useDeleteSimulationMutation,
   useSimulationsQuery,
   useTopologiesQuery,
 } from '@/lib/queries';
@@ -21,7 +22,7 @@ import {
 } from '@beyondevent/ui';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -41,67 +42,6 @@ const STATUS_CLASSES: Record<Simulation['status'], string> = {
   failed: 'text-rose-500 border-rose-500/30 bg-rose-500/5',
 };
 
-const columns: ColumnDef<Simulation>[] = [
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    cell: ({ row }) => (
-      <Link
-        to="/simulations/$id"
-        params={{ id: row.original.id }}
-        className="font-semibold text-foreground hover:text-indigo-400 hover:underline transition-colors"
-      >
-        {row.original.name}
-      </Link>
-    ),
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Created At',
-    cell: ({ row }) => new Date(row.original.createdAt).toLocaleString(),
-  },
-  {
-    accessorKey: 'topologyId',
-    header: 'Topology',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-xs">
-        {row.original.topologyId ? 'Has Linked Topology' : 'None'}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.original.status;
-      return (
-        <Badge
-          variant={
-            status === 'running' ? 'default' : status === 'failed' ? 'destructive' : 'outline'
-          }
-          className={`text-xs font-semibold px-2.5 py-0.5 capitalize ${STATUS_CLASSES[status]}`}
-        >
-          {status}
-        </Badge>
-      );
-    },
-  },
-  {
-    id: 'actions',
-    header: 'Actions',
-    cell: ({ row }) => (
-      <Link
-        to="/simulations/$id"
-        params={{ id: row.original.id }}
-        className="group text-xs font-semibold text-indigo-500 hover:text-indigo-400 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer inline-flex items-center gap-1"
-      >
-        <span>View Details</span>
-        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-      </Link>
-    ),
-  },
-];
-
 import { AnimatePresence, motion } from 'motion/react';
 
 export const Route = createFileRoute('/')({
@@ -116,6 +56,79 @@ function IndexPage() {
   const { data: simulations = [], isLoading, error } = useSimulationsQuery();
   const { data: topologies = [] } = useTopologiesQuery({ enabled: showForm });
   const createMutation = useCreateSimulationMutation();
+  const deleteMutation = useDeleteSimulationMutation();
+
+  const columns: ColumnDef<Simulation>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <Link
+          to="/simulations/$id"
+          params={{ id: row.original.id }}
+          className="font-semibold text-foreground hover:text-indigo-400 hover:underline transition-colors"
+        >
+          {row.original.name}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created At',
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString(),
+    },
+    {
+      accessorKey: 'topologyId',
+      header: 'Topology',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground text-xs">
+          {row.original.topologyId ? 'Has Linked Topology' : 'None'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        return (
+          <Badge
+            variant={
+              status === 'running' ? 'default' : status === 'failed' ? 'destructive' : 'outline'
+            }
+            className={`text-xs font-semibold px-2.5 py-0.5 capitalize ${STATUS_CLASSES[status]}`}
+          >
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <Link
+            to="/simulations/$id"
+            params={{ id: row.original.id }}
+            className="group text-xs font-semibold text-indigo-500 hover:text-indigo-400 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer inline-flex items-center gap-1"
+          >
+            <span>View Details</span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => deleteMutation.mutate(row.original.id)}
+            disabled={deleteMutation.isPending}
+            className="text-rose-500 hover:text-rose-400 transition-colors disabled:opacity-40 cursor-pointer"
+            title="Delete simulation"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   const handleCreate = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

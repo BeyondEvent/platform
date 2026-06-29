@@ -20,7 +20,7 @@ const WorkerSchema = z.object({
     'error',
   ]),
   tags: z.array(z.string()),
-  createdAt: z.date().transform((s) => new Date(s).toISOString()),
+  createdAt: z.string(),
 });
 
 type WorkerRow = typeof workers.$inferSelect;
@@ -73,6 +73,93 @@ export async function workerRoutes(app: FastifyInstance): Promise<void> {
       });
       if (row === undefined) return reply.status(404).send({ message: 'Worker not found' });
       return toResponse(row);
+    },
+  );
+
+  a.post(
+    '/',
+    {
+      schema: {
+        tags: ['Workers'],
+        body: z.object({
+          workerId: z.string().min(1),
+          name: z.string().min(1),
+          version: z.string().min(1),
+          tags: z.array(z.string()).default([]),
+        }),
+        response: { 201: WorkerSchema },
+      },
+    },
+    async (req, reply) => {
+      const [row] = await app.db
+        .insert(workers)
+        .values({
+          workerId: req.body.workerId,
+          name: req.body.name,
+          version: req.body.version,
+          tags: req.body.tags,
+          state: 'idle',
+        })
+        .onConflictDoUpdate({
+          target: workers.workerId,
+          set: {
+            name: req.body.name,
+            version: req.body.version,
+            tags: req.body.tags,
+            state: 'idle',
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (row === undefined) throw new Error('Insert returned no rows');
+      return reply.status(201).send(toResponse(row));
+    },
+  );
+
+  a.patch(
+    '/:id/state',
+    {
+      schema: {
+        tags: ['Workers'],
+        params: z.object({ id: z.uuid() }),
+        body: z.object({
+          state: z.enum([
+            'idle',
+            'subscribing',
+            'receiving',
+            'validating',
+            'executing',
+            'publishing',
+            'acking',
+            'error',
+          ]),
+        }),
+        response: { 200: WorkerSchema, 404: z.object({ message: z.string() }) },
+      },
+    },
+    async (req, reply) => {
+      const [row] = await app.db
+        .update(workers)
+        .set({ state: req.body.state, updatedAt: new Date() })
+        .where(eq(workers.id, req.params.id))
+        .returning();
+      if (row === undefined) return reply.status(404).send({ message: 'Worker not found' });
+      return toResponse(row);
+    },
+  );
+
+  a.delete(
+    '/:id',
+    {
+      schema: {
+        tags: ['Workers'],
+        params: z.object({ id: z.uuid() }),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      await app.db.delete(workers).where(eq(workers.id, req.params.id));
+      return reply.status(204).send(null);
     },
   );
 }

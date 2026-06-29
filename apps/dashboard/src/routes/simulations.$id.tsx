@@ -6,7 +6,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { socket } from '../lib/socket';
 
 import {
+  useChaosConfigQuery,
   useLinkTopologyMutation,
+  useMetricsSummaryQuery,
   useRenameSimulationMutation,
   useReplayEventMutation,
   useReplaySimulationMutation,
@@ -14,9 +16,11 @@ import {
   useSimulationQuery,
   useTopologiesQuery,
   useTopologyQuery,
+  useUpdateChaosMutation,
   useUpdateSimulationStatusMutation,
 } from '@/lib/queries';
 import {
+  SimulationChaosPanel,
   SimulationContext,
   SimulationEventLogs,
   SimulationHeader,
@@ -107,6 +111,9 @@ function SimulationDetailPage() {
   const { data: topology } = useTopologyQuery(sim?.topologyId);
   const { data: allTopologies = [] } = useTopologiesQuery({ enabled: topologySelectorOpen });
   const { data: persistedEvents = [], refetch: refetchEvents } = useSimulationEventsQuery(id);
+  const { data: chaosConfig } = useChaosConfigQuery(id);
+  const updateChaosMutation = useUpdateChaosMutation(id);
+  const { data: metrics } = useMetricsSummaryQuery();
 
   useEffect(() => {
     socket.emit('simulation:join', id);
@@ -119,11 +126,18 @@ function SimulationDetailPage() {
       void qc.invalidateQueries({ queryKey: ['simulation', id] });
     }
 
+    // Re-join the room after reconnect (handles API restart or startup race)
+    function onReconnect() {
+      socket.emit('simulation:join', id);
+    }
+
     socket.on('simulation:event', onSimulationEvent);
+    socket.on('connect', onReconnect);
 
     return () => {
       socket.emit('simulation:leave', id);
       socket.off('simulation:event', onSimulationEvent);
+      socket.off('connect', onReconnect);
     };
   }, [id, qc]);
 
@@ -276,6 +290,50 @@ function SimulationDetailPage() {
         <section>
           <SimulationEventLogs />
         </section>
+        {chaosConfig !== undefined && (
+          <section>
+            <SimulationChaosPanel
+              simulationId={id}
+              config={chaosConfig}
+              isPending={updateChaosMutation.isPending}
+              onSave={(cfg) => updateChaosMutation.mutate(cfg)}
+            />
+          </section>
+        )}
+        {metrics !== undefined && (
+          <section>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(
+                [
+                  { label: 'Total Events', value: metrics.totalEvents },
+                  { label: 'Total Simulations', value: metrics.totalSimulations },
+                  { label: 'Running', value: metrics.runningSimulations },
+                  { label: 'Active Workers', value: metrics.activeWorkers },
+                ] as { label: string; value: number }[]
+              ).map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1 shadow-sm"
+                >
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {label}
+                  </span>
+                  <span className="text-2xl font-extrabold text-foreground tabular-nums">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5 text-right">
+              Broker:{' '}
+              <span
+                className={`font-semibold ${metrics.brokerConnected ? 'text-emerald-500' : 'text-rose-500'}`}
+              >
+                {metrics.brokerType} {metrics.brokerConnected ? '●' : '○'}
+              </span>
+            </p>
+          </section>
+        )}
       </main>
     </SimulationContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { createInMemoryEventBus } from '@beyondevent/event-bus';
+import { createInMemoryEventBus, createRedisStreamsAdapter } from '@beyondevent/event-bus';
 import type { IReplayableEventBusAdapter } from '@beyondevent/event-bus';
 import { NoopMetricsRegistry } from '@beyondevent/metrics';
 import type { IMetricsRegistry } from '@beyondevent/metrics';
@@ -20,6 +20,24 @@ export interface BootstrapContext {
   readonly lifecycle: ILifecycle;
   readonly metrics: IMetricsRegistry;
   readonly gateway: IWebSocketGateway;
+  readonly brokerType: 'redis' | 'memory';
+}
+
+async function createEventBus(
+  redisUrl: string | undefined,
+): Promise<{ bus: IReplayableEventBusAdapter; brokerType: 'redis' | 'memory' }> {
+  if (redisUrl) {
+    try {
+      const bus = createRedisStreamsAdapter({ url: redisUrl });
+      await bus.connect();
+      return { bus, brokerType: 'redis' };
+    } catch (err) {
+      console.warn('[bootstrap] Redis unavailable, falling back to in-memory bus:', err);
+    }
+  }
+  const bus = createInMemoryEventBus();
+  await bus.connect();
+  return { bus, brokerType: 'memory' };
 }
 
 export async function bootstrap(): Promise<BootstrapContext> {
@@ -32,9 +50,7 @@ export async function bootstrap(): Promise<BootstrapContext> {
     throw new Error('Failed to connect to the database. Please check your DATABASE_URL.');
   }
 
-  const eventBus = createInMemoryEventBus();
-  await eventBus.connect();
-  // Phase 3: swap createInMemoryEventBus() for createRedisStreamsAdapter({ url: config.REDIS_URL })
+  const { bus: eventBus, brokerType } = await createEventBus(config.REDIS_URL);
 
   const metrics: IMetricsRegistry = NoopMetricsRegistry;
 
@@ -45,10 +61,9 @@ export async function bootstrap(): Promise<BootstrapContext> {
   const stopPersister = startEventPersister(eventBus, db);
 
   const lifecycle = createLifecycle();
-  // LIFO teardown: gateway first, then persister, then bus.
   lifecycle.onStop(async () => await eventBus.disconnect());
   lifecycle.onStop(async () => stopPersister());
   lifecycle.onStop(async () => await gateway.close());
 
-  return { config, db, eventBus, lifecycle, metrics, gateway };
+  return { config, db, eventBus, lifecycle, metrics, gateway, brokerType };
 }
